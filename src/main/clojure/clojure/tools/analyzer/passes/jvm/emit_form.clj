@@ -31,6 +31,7 @@
   {:pass-info {:walk :none :depends #{#'uniquify-locals} :compiler true}}
   ([ast] (emit-form ast #{}))
   ([ast opts]
+   (println "passes: emit-form.")
      (binding [default/-emit-form* -emit-form*]
        (-emit-form* ast opts))))
 
@@ -47,6 +48,7 @@
 
 (defmethod -emit-form :const
   [{:keys [type val] :as ast} opts]
+  (println "passes: -emit-form :const. " val)
   (if (and (= type :class)
            (:qualified-symbols opts))
     (symbol (.getName ^Class val))

@@ -79,6 +79,7 @@
    :ns         (ns-name *ns*)})
 
 (defn desugar-symbol [form env]
+  (println "DESUGAR-SYMBOL: " form)
   (let [sym-ns (namespace form)]
     (if-let [target (and sym-ns
                          (not (resolve-ns (symbol sym-ns) env))
@@ -88,6 +89,7 @@
       form)))
 
 (defn desugar-host-expr [form env]
+  (println "DESUGAR-HOST-EXPR")
   (let [[op & expr] form]
     (if (symbol? op)
       (let [opname (name op)
@@ -121,11 +123,18 @@
            :else form)))
       form)))
 
+(defn macroexpand-0
+  ""
+  ([form] (macroexpand-0 form (empty-env)))
+  ([form env] form))
+
 (defn macroexpand-1
   "If form represents a macro form or an inlineable function,returns its expansion,
    else returns form."
   ([form] (macroexpand-1 form (empty-env)))
   ([form env]
+   (println "MACROEXPAND-1: " form)
+   (println "MACROEXPAND-1 meta: " (meta form))
      (env/ensure (global-env)
        (cond
 
@@ -134,6 +143,7 @@
           (if (specials op)
             form
             (let [v (resolve-sym op env)
+                  _ (println "op " op " resolves to: " v)
                   m (meta v)
                   local? (-> env :locals (get op))
                   macro? (and (not local?) (:macro m)) ;; locals shadow macros
@@ -143,6 +153,7 @@
                                    (inline-arities-f (count args)))
                                (:inline m))
                   t (:tag m)]
+              (println "SEQ; macro? " macro? "; local? " local? "; inline? " inline?)
               (cond
 
                macro?
@@ -154,6 +165,7 @@
 
                inline?
                (let [res (apply inline? args)]
+                 (println "APPLY INLINE ARGS: " args " RES: " res)
                  (update-ns-map!)
                  (if (obj? res)
                    (vary-meta res merge
@@ -162,10 +174,12 @@
                    res))
 
                :else
-               (desugar-host-expr form env)))))
+               (do (println "XXXXXXXXXXXXXXXX")
+               (desugar-host-expr form env))))))
 
         (symbol? form)
-        (desugar-symbol form env)
+               (do (println "ZZZZZZZZZZZZZZZZ")
+        (desugar-symbol form env))
 
         :else
         form))))
@@ -423,11 +437,13 @@
    Use #'clojure.tools.analyzer.passes/schedule to get a function from a set of passes that
    run-passes can be bound to."
   [ast]
-  (scheduled-default-passes ast))
+  identity
+  #_(scheduled-default-passes ast))
 
 (def default-passes-opts
   "Default :passes-opts for `analyze`"
-  {:collect/what                    #{:constants :callsites}
+  {}
+  #_{:collect/what                    #{:constants :callsites}
    :collect/where                   #{:deftype :reify :fn}
    :collect/top-level?              false
    :collect-closed-overs/where      #{:deftype :reify :fn :loop :try}
@@ -454,7 +470,7 @@
   ([form env] (analyze form env {}))
   ([form env opts]
      (with-bindings (merge {Compiler/LOADER     (RT/makeClassLoader)
-                            #'ana/macroexpand-1 macroexpand-1
+                            #'ana/macroexpand-1 macroexpand-0 ;; macroexpand-1
                             #'ana/create-var    create-var
                             #'ana/parse         parse
                             #'ana/var?          var?
